@@ -6,7 +6,8 @@
   "dependencies": {
     "express": "^4.15.2",
     "lodash": "^4.17.4",
-    "nightmare": "^2.10.0"
+    "nightmare": "^2.10.0",
+    "serve-index": "^1.8.0"
   },
   "devDependencies": {},
   "scripts": {
