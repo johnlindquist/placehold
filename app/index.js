@@ -12,12 +12,12 @@ if (!fs.existsSync(cacheDir)) fs.mkdir(cacheDir);
 
 app.use(express.static(cacheDir));
 
-const browser = new Nightmare({
-  show: false,
-  frame: false
-});
-
 app.get("/", async (req, res) => {
+  const browser = new Nightmare({
+    show: false,
+    frame: false
+  });
+
   const { query } = req;
 
   console.log(query);
@@ -55,6 +55,8 @@ app.get("/", async (req, res) => {
 
   res.set("Content-Type", "image/png");
   res.sendFile(absFile);
+
+  await browser.end();
 });
 
 app.listen(3000, () => console.log("server running on http://localhost:3000"));
