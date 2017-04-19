@@ -5,108 +5,104 @@ const _ = require("lodash");
 const fs = require("fs");
 const path = require("path");
 const app = express();
+const download = require("image-downloader");
 
 const cacheDir = "./cache";
 const absCache = `${path.join(__dirname, cacheDir)}`;
 
-function calculateContentHeight() {
-  function getNumericalStyle(element, property) {
-    return parseFloat(
-      window.getComputedStyle(element, null).getPropertyValue(property)
-    );
-  }
-
-  var html = document.documentElement;
-  var body = document.body;
-
-  var bodyMarginBottom = getNumericalStyle(body, "margin-bottom");
-  var bodyMarginTop = getNumericalStyle(body, "margin-top");
-  var htmlMarginBottom = getNumericalStyle(html, "margin-bottom");
-  var htmlMarginTop = getNumericalStyle(html, "margin-top");
-
-  var bodyPaddingBottom = getNumericalStyle(body, "padding-bottom");
-  var bodyPaddingTop = getNumericalStyle(body, "padding-top");
-  var htmlPaddingBottom = getNumericalStyle(html, "padding-bottom");
-  var htmlPaddingTop = getNumericalStyle(html, "padding-top");
-
-  var margins =
-    bodyMarginBottom + bodyMarginTop + htmlMarginBottom + htmlMarginTop;
-  var paddings =
-    bodyPaddingBottom + bodyPaddingTop + htmlPaddingBottom + htmlPaddingTop;
-
-  return html.offsetHeight + Math.round(margins + paddings);
-}
-
 if (!fs.existsSync(cacheDir)) fs.mkdir(cacheDir);
 
-app.use("/cache", serveIndex(absCache, { icons: true }));
+app.use("/cache", serveIndex(absCache, {
+  icons: true
+}));
 app.use("/cache", express.static(cacheDir));
 
-app.get("/", async (req, res) => {
-  const { query } = req;
+
+const getUrl = async(q, w, h) => await new Nightmare({
+  show: false,
+  gotoTimeout: 4000,
+  waitTimeout: 4000,
+  executionTimeout: 1000
+}).goto(
+  `https://www.google.com/search?q=${q}&tbm=isch&tbs=itp:animated,isz:ex,iszw:${w},iszh:${h}`
+).wait('a[href^="/imgres"][style^="background"]').evaluate(
+  () =>
+  Array.from(
+    document.querySelectorAll('a[href^="/imgres"][style^="background"]')
+  )[0].href
+).end();
+
+const parseUrl = url => _.split(
+  decodeURIComponent(
+    _.replace(url, "https://www.google.com/imgres?imgurl=", "")
+  ),
+  "&"
+)[0];
+
+const createDest = (q, w, h) => `${path.join(__dirname, "./cache")}/${q}-${w}x${h}.jpg`;
+
+const checkOrDownload = async(res, q, w, h) => {
+  const file = createDest(q, w, h)
+
+  console.log(file)
+  if (fs.existsSync(file)) {
+    res.sendFile(file);
+    return;
+  }
+
+  const url = await getUrl(q, w, h);
+  const parsedUrl = parseUrl(url)
+
+  console.log(`
+      ${parsedUrl}
+
+      ${file}
+    `);
+
   const {
-    url = "https://egghead.io",
-    w = 1024,
-    h = 768,
-    update = false,
-    full = false
-  } = query;
-
-  const fileName = _.replace(
-    `/${url}-${w}x${h}${full ? "-full" : ""}.png`,
-    /\/\/|:|\//g,
-    ""
-  );
-
-  if (!url.startsWith("http")) {
-    res.send(`Please include "http://" or "https://" in your "url"`);
-    return;
-  }
-
-  const absFile = `${absCache}/${fileName}`;
-
-  if (fs.existsSync(absFile) && !update) {
-    res.sendFile(absFile);
-    return;
-  }
-
-  const browser = new Nightmare({
-    show: false,
-    frame: false
+    filename,
+    image
+  } = await download.image({
+    url: parsedUrl,
+    dest: file // Save to /path/to/dest/image.jpg
   });
 
-  try {
-    const width = _.clamp(_.toNumber(w), 320, 2560);
-    const height = _.clamp(_.toNumber(h), 240, 1440);
+  console.log(`${filename} saved`);
 
-    await browser.goto(url);
-
-    if (full) {
-      const contentHeight = await browser.evaluate(calculateContentHeight);
-      await browser.viewport(width, contentHeight);
-    } else {
-      await browser.viewport(width, height);
-    }
-
-    await browser.wait(500);
-    await browser.evaluate(() =>
-      document.styleSheets[0].insertRule(
-        "::-webkit-scrollbar { display:none; }"
-      )
-    );
-
-    await browser.wait(1500);
-    await browser.screenshot(`${cacheDir}/${fileName}`);
-
-    res.set("Content-Type", "image/png");
-    res.sendFile(absFile);
-
-    await browser.end();
-  } catch (e) {
-    console.log(e);
-    res.send("something went wrong...");
-    await browser.end();
+  if (fs.existsSync(file)) {
+    res.sendFile(file);
+    return;
+  } else {
+    res.send('download failed...')
   }
-});
+}
+
+
+const findFile = async(req, res) => {
+  console.log(req.params)
+
+  try {
+
+    const {
+      params
+    } = req;
+
+    const {
+      q = "puppy", w = 640, h = 480
+    } = params;
+
+    await checkOrDownload(res, q, w, h)
+  } catch (e) {
+    console.log(e)
+    await checkOrDownload(res, `no results found`, 640, 480)
+  }
+}
+
+
+app.get("/:q?/:w?/:h?", findFile);
 
 app.listen(3000, () => console.log("server running on http://localhost:3000"));
+
+//document.querySelectorAll('img[alt="Image result for cat"]')[0]
+
+//spans.find(e => e.innerText === "View image")

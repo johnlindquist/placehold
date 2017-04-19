@@ -1,6 +1,6 @@
 FROM node:7.6.0
 
-LABEL name="screenshot.johnlindquist.com"
+LABEL name="placehold.johnlindquist.com"
 
 RUN apt-get update &&\
     apt-get install -y \
