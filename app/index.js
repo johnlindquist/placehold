@@ -24,7 +24,7 @@ const getUrl = async(q, w, h) => await new Nightmare({
   waitTimeout: 4000,
   executionTimeout: 1000
 }).goto(
-  `https://www.google.com/search?q=${q}&tbm=isch&tbs=itp:animated,isz:ex,iszw:${w},iszh:${h}`
+  `https://www.google.com/search?q=${q}&tbm=isch&tbs=isz:ex,iszw:${w},iszh:${h}`
 ).wait('a[href^="/imgres"][style^="background"]').evaluate(
   () =>
   Array.from(
